@@ -3,11 +3,21 @@
 pragma solidity ^0.8.7;
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+// ./interfaces/AutomationCompatibleInterface.sol
+import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
+error Raffle__NotOpen();
 
-contract Raffle is VRFConsumerBaseV2 {
+contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
+    /**
+     * type declarations
+     */
+    enum RaffleState {
+        OPEN,
+        CALCULATING
+    }
     /**
      * State varibales
      */
@@ -21,9 +31,16 @@ contract Raffle is VRFConsumerBaseV2 {
     uint16 private constant REQUEST_COMFIRMATIONS = 3;
     uint32 private constant NUM_WORDS = 1;
     /**
+     * time pass
+     */
+    uint256 private s_lastTimeStamp;
+    uint256 private immutable i_interval;
+    /**
      * lottery variable
      */
     address private s_recentWinner;
+
+    RaffleState private s_raffleState;
 
     /** event */
     event RaffleEnter(address indexed player);
@@ -35,24 +52,53 @@ contract Raffle is VRFConsumerBaseV2 {
         uint256 entranceFee,
         bytes32 gasLane,
         uint64 subscriptionId,
-        uint32 callbackGasLimit
+        uint32 callbackGasLimit,
+        uint256 interval
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         i_entranceFee = entranceFee;
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
+        s_raffleState = RaffleState.OPEN;
+        s_lastTimeStamp = block.timestamp;
+        i_interval = interval;
     }
 
     function enterRaffle() public payable {
         if (msg.value < i_entranceFee) {
             revert Raffle__NotEnoughETHEntered();
         }
+        if (s_raffleState != RaffleState.OPEN) {
+            revert Raffle__NotOpen();
+        }
         s_players.push(payable(msg.sender));
         emit RaffleEnter(msg.sender);
     }
 
+    /**
+     * @dev This is the function that Chainlink VRF node
+     * calls to send the money to the random winner.
+     */
+    function checkUpkeep(
+        bytes calldata /*checkData*/
+    )
+        external
+        override
+        returns (
+            bool upkeepNeeded,
+            bytes memory /*performData*/
+        )
+    {
+        bool isOpen = (RaffleState.OPEN == s_raffleState);
+        bool timePassed = (block.timestamp - s_lastTimeStamp > i_interval);
+        bool hasPlayers = (s_players.length > 0);
+        bool hasBalance = (address(this).balance > 0);
+        upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
+    }
+
     function requestRandomWinner() external {
+        s_raffleState = RaffleState.CALCULATING;
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
             i_subscriptionId,
@@ -63,6 +109,12 @@ contract Raffle is VRFConsumerBaseV2 {
         emit RequestedRaffleWinner(requestId);
     }
 
+    // s_players size 10
+    // randomNumber 202
+    // 202 % 10 ? what's doesn't divide evenly into 202?
+    // 20 * 10 = 200
+    // 2
+    // 202 % 10 = 2
     function fulfillRandomWords(
         uint256, /*requestId*/
         uint256[] memory randomWords
@@ -71,6 +123,9 @@ contract Raffle is VRFConsumerBaseV2 {
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
+        s_raffleState = RaffleState.OPEN;
+        //reset our array after winner is pick
+        s_players = new address payable[](0);
         (bool success, ) = recentWinner.call{value: address(this).balance}("");
         if (!success) {
             revert Raffle__TransferFailed();
