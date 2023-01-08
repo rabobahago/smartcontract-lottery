@@ -1,6 +1,7 @@
 const { network, ethers } = require("hardhat")
+const { verify } = require("../utils/verify")
 const { developmentChains, networkConfig } = require("../helper-hardhat-config")
-const VRF_SUB_FUND_AMOUNT = ethers.utils.parseEther("30")
+const VRF_SUB_FUND_AMOUNT = ethers.utils.parseEther("1")
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments
     const { deployer } = await getNamedAccounts()
@@ -14,8 +15,8 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         //subscript to event from code
         const transactionResponse =
             await vrfCoordinatorV2Mock.createSubscription()
-        const transactionReceipt = transactionResponse.wait(1)
-        subscriptionId = transactionReceipt.events[0].args.subId
+        const transactionReceipt = await transactionResponse.wait(1)
+        subscriptionId = await transactionReceipt.events[0].args.subId
         //fund the our subscription
         await vrfCoordinatorV2Mock.fundSubscription(
             subscriptionId,
@@ -25,6 +26,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         vrfCoordinatorV2Address = networkConfig[chainId]["vrfCoordinatorV2"]
         subscriptionId = networkConfig[chainId]["subscriptionId"]
     }
+    console.log("hello")
     const entranceFee = networkConfig[chainId]["entranceFee"]
     const gasLane = networkConfig[chainId]["gasLane"]
     const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"]
@@ -38,10 +40,19 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
         interval,
     ]
 
-    const raffle = await deployer("Raffle", {
+    const raffle = await deploy("Raffle", {
         from: deployer,
         args: args,
         log: true,
         waitConfirmations: network.config.blockConfirmations,
     })
+    if (
+        !developmentChains.includes(network.name) &&
+        process.env.ETHERSCAN_API_KEY
+    ) {
+        log("Log verying.....")
+        await verify(raffle.address, args)
+    }
+    log("-------------------------------------------------------------")
 }
+module.exports.tags = ["all", "raffle"]
