@@ -64,7 +64,7 @@ developmentChains.includes(network.name)
                       console.log("Ok, time to wait...")
                       const winnerStartingBalance =
                           await accounts[0].getBalance()
-
+                          await raffle.performUpkeep("0x");
                       // and this code WONT complete until our listener has finished listening!
                   })
               })
