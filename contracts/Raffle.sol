@@ -4,7 +4,7 @@ pragma solidity ^0.8.7;
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 // ./interfaces/AutomationCompatibleInterface.sol
-import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
@@ -15,7 +15,7 @@ error Raffle__UpkeepNotNeeded(
     uint256 raffleState
 );
 
-contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
+contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
     /**
      * type declarations
      */
@@ -95,12 +95,12 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
             bytes memory /*performData*/
         )
     {
-        bool isOpen = (s_raffleState == RaffleState.OPEN);
+        bool isOpen = RaffleState.OPEN == s_raffleState;
         bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
-        bool hasPlayers = (s_players.length > 0);
-        bool hasBalance = (address(this).balance > 0);
-        upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
-        return (upkeepNeeded, "0x");
+        bool hasPlayers = s_players.length > 0;
+        bool hasBalance = address(this).balance > 0;
+        upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
+        //return (upkeepNeeded, "0x0");
     }
 
     function performUpkeep(
@@ -139,9 +139,10 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
-        s_raffleState = RaffleState.OPEN;
         //reset our array after winner is pick
         s_players = new address payable[](0);
+        s_raffleState = RaffleState.OPEN;
+
         //reset our timestamp after winner is pick
         s_lastTimeStamp = block.timestamp;
         (bool success, ) = recentWinner.call{value: address(this).balance}("");

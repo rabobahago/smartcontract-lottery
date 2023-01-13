@@ -34,34 +34,34 @@ const {
                   )
               })
           })
-          //   describe("enterRaffle", async function () {
-          //       it("revert when you don't pay enough eth", async function () {
-          //           await expect(raffle.enterRaffle()).to.be.revertedWith(
-          //               "Raffle__NotEnoughETHEntered"
-          //           )
-          //       })
-          //       it("It record players when the enter", async function () {
-          //           await raffle.enterRaffle({ value: raffleEntranceFee })
-          //           const playerFromContract = await raffle.getPlayer(0)
-          //           assert(playerFromContract, deployer)
-          //       })
-          //       it("it emit an event on enter", async function () {
-          //           await expect(
-          //               raffle.enterRaffle({ value: raffleEntranceFee })
-          //           ).to.emit(raffle, "RaffleEnter")
-          //       })
-          //       it("it don't allow entrance when raffle is calculating", async function () {
-          //           await raffle.enterRaffle({ value: raffleEntranceFee })
-          //           await network.provider.send("evm_increaseTime", [
-          //               interval.toNumber() + 1,
-          //           ])
-          //           await network.provider.send("evm_mine", [])
-          //           await raffle.performUpkeep([])
-          //           await expect(
-          //               raffle.enterRaffle({ value: raffleEntranceFee })
-          //           ).to.be.revertedWith("Raffle__NotOpen")
-          //       })
-          //   })
+          describe("enterRaffle", async function () {
+              it("revert when you don't pay enough eth", async function () {
+                  await expect(raffle.enterRaffle()).to.be.revertedWith(
+                      "Raffle__NotEnoughETHEntered"
+                  )
+              })
+              it("It record players when the enter", async function () {
+                  await raffle.enterRaffle({ value: raffleEntranceFee })
+                  const playerFromContract = await raffle.getPlayer(0)
+                  assert(playerFromContract, deployer)
+              })
+              it("it emit an event on enter", async function () {
+                  await expect(
+                      raffle.enterRaffle({ value: raffleEntranceFee })
+                  ).to.emit(raffle, "RaffleEnter")
+              })
+              it("it don't allow entrance when raffle is calculating", async function () {
+                  await raffle.enterRaffle({ value: raffleEntranceFee })
+                  await network.provider.send("evm_increaseTime", [
+                      interval.toNumber() + 1,
+                  ])
+                  await network.provider.send("evm_mine", [])
+                  await raffle.performUpkeep([])
+                  await expect(
+                      raffle.enterRaffle({ value: raffleEntranceFee })
+                  ).to.be.revertedWith("Raffle__NotOpen")
+              })
+          })
 
           describe("checkUpkeep", function () {
               it("returns false if people haven't sent any ETH", async () => {
@@ -197,7 +197,7 @@ const {
                       i++
                   ) {
                       // i = 2; i < 5; i=i+1
-                      raffle = raffleContract.connect(accounts[i]) // Returns a new instance of the Raffle contract connected to player
+                      raffle = raffleEntranceFee.connect(accounts[i]) // Returns a new instance of the Raffle contract connected to player
                       await raffle.enterRaffle({ value: raffleEntranceFee })
                   }
                   const startingTimeStamp = await raffle.getLastTimeStamp() // stores starting timestamp (before we fire our event)

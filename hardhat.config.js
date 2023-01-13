@@ -17,7 +17,6 @@ module.exports = {
     networks: {
         hardhat: {
             chainId: 31337,
-            blockComfirmations: 1,
         },
         goerli: {
             chainId: 5,
