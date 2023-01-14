@@ -8,10 +8,13 @@ async function mockKeepers() {
         const tx = await raffle.performUpkeep(checkData)
         const txReceipt = await tx.wait(1)
         const requestId = txReceipt.events[1].args.requestId
+        await mockVrf(requestId, raffle)
         console.log(`Performed upkeep with RequestId: ${requestId}`)
-        if (network.config.chainId == 31337) {
-            await mockVrf(requestId, raffle)
-        }
+        // if (network.config.chainId == 31337) {
+        //     console.log(`mockVrf call start`)
+        //     await mockVrf(requestId, raffle)
+        //     console.log(`mockVrf call end`)
+        // }
     } else {
         console.log("No upkeep needed!")
     }

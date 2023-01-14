@@ -4,7 +4,7 @@ pragma solidity ^0.8.7;
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 // ./interfaces/AutomationCompatibleInterface.sol
-import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
@@ -15,7 +15,7 @@ error Raffle__UpkeepNotNeeded(
     uint256 raffleState
 );
 
-contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
+contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     /**
      * type declarations
      */
@@ -82,17 +82,23 @@ contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
     }
 
     /**
-     * @dev This is the function that Chainlink VRF node
-     * calls to send the money to the random winner.
+     * @dev This is the function that the Chainlink Keeper nodes call
+     * they look for `upkeepNeeded` to return True.
+     * the following should be true for this to return true:
+     * 1. The time interval has passed between raffle runs.
+     * 2. The lottery is open.
+     * 3. The contract has ETH.
+     * 4. Implicity, your subscription is funded with LINK.
      */
     function checkUpkeep(
-        bytes memory /*checkData*/
+        bytes memory /* checkData */
     )
         public
+        view
         override
         returns (
             bool upkeepNeeded,
-            bytes memory /*performData*/
+            bytes memory /* performData */
         )
     {
         bool isOpen = RaffleState.OPEN == s_raffleState;
@@ -100,14 +106,19 @@ contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
         bool hasPlayers = s_players.length > 0;
         bool hasBalance = address(this).balance > 0;
         upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
-        //return (upkeepNeeded, "0x0");
+        return (upkeepNeeded, "0x0"); // can we comment this out?
     }
 
+    /**
+     * @dev Once `checkUpkeep` is returning `true`, this function is called
+     * and it kicks off a Chainlink VRF call to get a random winner.
+     */
     function performUpkeep(
-        bytes calldata /*performData*/
+        bytes calldata /* performData */
     ) external override {
-        (bool upkeepNeed, ) = checkUpkeep("");
-        if (!upkeepNeed) {
+        (bool upkeepNeeded, ) = checkUpkeep("");
+        // require(upkeepNeeded, "Upkeep not needed");
+        if (!upkeepNeeded) {
             revert Raffle__UpkeepNotNeeded(
                 address(this).balance,
                 s_players.length,
@@ -122,30 +133,32 @@ contract Raffle is VRFConsumerBaseV2, AutomationCompatibleInterface {
             i_callbackGasLimit,
             NUM_WORDS
         );
+        // Quiz... is this redundant?
         emit RequestedRaffleWinner(requestId);
     }
 
-    // s_players size 10
-    // randomNumber 202
-    // 202 % 10 ? what's doesn't divide evenly into 202?
-    // 20 * 10 = 200
-    // 2
-    // 202 % 10 = 2
+    /**
+     * @dev This is the function that Chainlink VRF node
+     * calls to send the money to the random winner.
+     */
     function fulfillRandomWords(
-        uint256, /*requestId*/
+        uint256, /* requestId */
         uint256[] memory randomWords
     ) internal override {
-        //we only care to first random word and then get it module by length of player array
+        // s_players size 10
+        // randomNumber 202
+        // 202 % 10 ? what's doesn't divide evenly into 202?
+        // 20 * 10 = 200
+        // 2
+        // 202 % 10 = 2
         uint256 indexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[indexOfWinner];
         s_recentWinner = recentWinner;
-        //reset our array after winner is pick
         s_players = new address payable[](0);
         s_raffleState = RaffleState.OPEN;
-
-        //reset our timestamp after winner is pick
         s_lastTimeStamp = block.timestamp;
         (bool success, ) = recentWinner.call{value: address(this).balance}("");
+        // require(success, "Transfer failed");
         if (!success) {
             revert Raffle__TransferFailed();
         }
