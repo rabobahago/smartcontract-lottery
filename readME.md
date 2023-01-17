@@ -94,7 +94,7 @@ Go back to [vrf.chain.link](https://vrf.chain.link/), under your subscription cl
 Go to [automation.chain.link](https://automation.chain.link/) and register a new upkeep. Choose `Custom logic` as the trigger mechanism for the upkeep and insert your `contract address`. Your UI will look something like this once completed:
 
 <div align = "center">
-    <img src="/images/CapturaKeepers.JPG">
+    <img src="/images/CapturaKeepers.jpg">
     <p>Screenshot. The optional fields can be left blank.</p>
 </div>
 
